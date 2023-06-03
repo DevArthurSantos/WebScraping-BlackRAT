@@ -27,21 +27,19 @@ class WebScraping:
         self.link = ""
         self.post_date = ""
         self.author = ""
-        self.page_count = 0
+        self.part_count = 0
         self.post_context_ps = []
         self.post_comments_ps = []
         self.post_comments = []
         self.author_list = []
         self.global_data = []
-        self.folder_path = ''
         self.GoodReacts = 0
         self.BadReacts = 0
         self.data_update = 1
         logging.basicConfig(filename='log.txt', level=logging.ERROR,
-                    format='%(asctime)s [%(levelname)s]: %(message)s')
+                            format='%(asctime)s [%(levelname)s]: %(message)s')
 
-    def init_driver(self, folder_path):
-        self.folder_path = folder_path
+    def init_driver(self,):
         options = Options()
         options.add_argument('--disable-gpu')
         options.add_argument('--disable-extensions')
@@ -137,16 +135,17 @@ class WebScraping:
         else:
             return
 
-    def pesquisar(self, valor_pesquisa):
+    def pesquisar(self,):
         for i in range(1, 10000):
-            url_pesquisa = f'https://www.blackrat.pro/search/?q={valor_pesquisa}&page={i}&quick=1&type=forums_topic'
+            url_pesquisa = f'https://www.blackrat.pro/discover/unread/?&stream_read=all&stream_date_type=relative&stream_classes[IPS%5Cforums%5CTopic]=T%C3%B3picos&stream_classes_type=1&stream_date_relative_days[val]=100000000000&stream_date_relative_days[unit]=w'
             self.driver.get(url_pesquisa)
             try:
                 next_button = self.wait.until(EC.visibility_of_element_located(
-                    (By.XPATH, '/html/body/main/div/div/div/div[2]/div[3]/div/div[1]/div/ul[1]/li[9]')))
+                    (By.XPATH, '//*[@data-action="loadMore"]')))
+                next_button.click()
             except TimeoutException:
                 break
-            self.page_count = i
+            self.part_count = i
             self.data_update = 1
             self.escanear_posts()
 
@@ -175,9 +174,9 @@ class WebScraping:
 
     def save(self):
         os.makedirs(
-            f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}", exist_ok=True)
+            f"Data/Part-[{self.part_count}]/Post-{self.data_update}", exist_ok=True)
 
-        filename = f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/data.json"
+        filename = f"Data/Part-[{self.part_count}]/Post-{self.data_update}/data.json"
         with open(filename, "w") as arquivo:
             json.dump(self.global_data, arquivo, indent=2)
 
@@ -206,14 +205,14 @@ class WebScraping:
                 if index == 0:
                     self.getReacts()
                     os.makedirs(
-                        f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/Imgs", exist_ok=True)
+                        f"Data/Part-[{self.part_count}]/Post-{self.data_update}/Imgs", exist_ok=True)
                     imagens = item.find_elements(By.XPATH, './/p/a/img')
                     for i, imagem in enumerate(imagens):
                         url_imagem = imagem.get_attribute('data-src')
                         alt_imagem = imagem.get_attribute('alt')
                         padrao_image_name = r"[<>:\"/\\|?*]"
                         resultado = re.sub(padrao_image_name, "", alt_imagem)
-                        nome_arquivo = f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/Imgs/{resultado}.png"
+                        nome_arquivo = f"Data/Part-[{self.part_count}]/Post-{self.data_update}/Imgs/{resultado}.png"
                         try:
                             response = requests.get(url_imagem)
                             response.raise_for_status()
@@ -255,15 +254,18 @@ class WebScraping:
             self.post_date = post_date_text_formatado
         except (TimeoutException, StaleElementReferenceException):
             post_date_text = "Não identificado"
-            self.post_date = unidecode(author) 
+            self.post_date = unidecode(author)
             return False
         try:
             link = titulo_element.get_attribute('href')
-            self.link = link
+            # Remover "?do=getNewComment" da URL
+            nova_url = re.sub(r"\?do=getNewComment", "", link)
+            # Substituir a parte "page/{number}" por "page/1"
+            nova_url = re.sub(r"(page\/)\d+", r"\g<1>1", nova_url)
+            self.link = nova_url
         except (TimeoutException, StaleElementReferenceException):
             return False
-
-        self.driver.execute_script(f"window.open('{link}', '_blank');")
+        self.driver.execute_script(f"window.open('{nova_url}', '_blank');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
         self.get_data_from_elements(
             '//*[@data-role="commentContent"]')
@@ -276,7 +278,7 @@ class WebScraping:
 
     def escanear_posts(self):
         self.wait.until(EC.presence_of_all_elements_located(
-            (By.XPATH, '/html/body/main/div/div/div/div[2]/div[3]/div/ol')))
+            (By.XPATH, '/html/body/main/div/div/div/section/div[2]/div/div/ol[1]')))
         posts = self.wait.until(EC.presence_of_all_elements_located(
             (By.XPATH, '//*[@data-role="activityItem"]')))
         for post in posts:
