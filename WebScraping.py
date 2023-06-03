@@ -25,6 +25,7 @@ class WebScraping:
         self.wait = None
         self.title = ""
         self.link = ""
+        self.post_date = ""
         self.author = ""
         self.page_count = 0
         self.post_context_ps = []
@@ -33,9 +34,11 @@ class WebScraping:
         self.author_list = []
         self.global_data = []
         self.folder_path = ''
-        self.godReacts = 0
-        self.badReacts = 0
+        self.GoodReacts = 0
+        self.BadReacts = 0
         self.data_update = 1
+        logging.basicConfig(filename='log.txt', level=logging.ERROR,
+                    format='%(asctime)s [%(levelname)s]: %(message)s')
 
     def init_driver(self, folder_path):
         self.folder_path = folder_path
@@ -88,8 +91,6 @@ class WebScraping:
                 (By.XPATH, '//*[@role="tablist"]')))
             ReactsNumber = self.wait.until(EC.presence_of_all_elements_located(
                 (By.XPATH, '//*[@role="tablist"]/li/a/span')))
-            god = 0
-            sad = 0
             for index, item in enumerate(ReactsNumber):
                 item_text = item.get_attribute('textContent')
                 text_formatado = unidecode(item_text)
@@ -97,9 +98,9 @@ class WebScraping:
                 resultado = re.search(padrao, text_formatado)
                 numero = resultado.group(1)
                 if index >= 1 and index < 6:
-                    self.godReacts += int(numero)
+                    self.GoodReacts += int(numero)
                 elif index >= 6:
-                    self.badReacts += int(numero)
+                    self.BadReacts += int(numero)
         except TimeoutException:
             return False
         try:
@@ -155,13 +156,14 @@ class WebScraping:
         post_context = ' '.join(
             post_context_lista_filtrada)
         dados = {
-            "title": self.title,
-            "link": self.link,
+            "Title": self.title,
+            "Date": self.post_date,
+            "Link": self.link,
             "Content": {
                 "Author": self.author,
                 "Reacts": {
-                    "god": self.godReacts,
-                    "bad": self.badReacts
+                    "Good": self.GoodReacts,
+                    "Bad": self.BadReacts
                 },
                 "context": post_context,
                 "comments": self.post_comments,
@@ -245,8 +247,16 @@ class WebScraping:
             self.author = author_formatado
         except (TimeoutException, StaleElementReferenceException, NoSuchElementException):
             author = "Não identificado"
-            author_formatado = unidecode(author)
-            self.author = author_formatado
+            self.author = unidecode(author)
+        try:
+            post_date = post.find_element(By.XPATH, './/*/*/*/*/time')
+            post_date_text = post_date.get_attribute('title')
+            post_date_text_formatado = unidecode(post_date_text)
+            self.post_date = post_date_text_formatado
+        except (TimeoutException, StaleElementReferenceException):
+            post_date_text = "Não identificado"
+            self.post_date = unidecode(author) 
+            return False
         try:
             link = titulo_element.get_attribute('href')
             self.link = link
