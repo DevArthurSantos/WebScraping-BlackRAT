@@ -18,6 +18,7 @@ import logging
 logging.basicConfig(filename='log.txt', level=logging.ERROR,
                     format='%(asctime)s [%(levelname)s]: %(message)s')
 
+
 class WebScraping:
     def __init__(self):
         self.driver = None
@@ -32,7 +33,7 @@ class WebScraping:
         self.author_list = []
         self.global_data = []
         self.folder_path = ''
-        self.godReacts =  0
+        self.godReacts = 0
         self.badReacts = 0
         self.data_update = 1
 
@@ -45,7 +46,6 @@ class WebScraping:
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--no-sandbox')
         options.add_argument('--window-size=426,240')
-        # options.add_argument("--headless=new")
 
         self.driver = webdriver.Chrome(options=options)
         self.wait = WebDriverWait(self.driver, 5)
@@ -69,25 +69,25 @@ class WebScraping:
             senha_field = self.driver.find_element(
                 By.XPATH, './/ul/li[2]/div/input')
             senha_field.send_keys(senha)
-
             envia_formulario = self.driver.find_element(
                 By.XPATH, '//*[@id="elSignIn_submit"]')
             envia_formulario.click()
         except TimeoutException:
             return False
-
         return True
-    
+
     def getReacts(self):
         try:
-            abrir_reacts = self.wait.until(EC.visibility_of_element_located((By.XPATH, '//*[@data-ipsdialog-title="Veja quem reagiu a isso"]')))
+            abrir_reacts = self.wait.until(EC.visibility_of_element_located(
+                (By.XPATH, '//*[@data-ipsdialog-title="Veja quem reagiu a isso"]')))
             abrir_reacts.click()
         except TimeoutException:
             return False
-        
         try:
-            self.wait.until(EC.visibility_of_element_located((By.XPATH, '//*[@role="tablist"]')))
-            ReactsNumber = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, '//*[@role="tablist"]/li/a/span')))
+            self.wait.until(EC.visibility_of_element_located(
+                (By.XPATH, '//*[@role="tablist"]')))
+            ReactsNumber = self.wait.until(EC.presence_of_all_elements_located(
+                (By.XPATH, '//*[@role="tablist"]/li/a/span')))
             god = 0
             sad = 0
             for index, item in enumerate(ReactsNumber):
@@ -100,19 +100,19 @@ class WebScraping:
                     self.godReacts += int(numero)
                 elif index >= 6:
                     self.badReacts += int(numero)
-                    
         except TimeoutException:
             return False
-        
         try:
-            fechar_reacts = self.wait.until(EC.visibility_of_element_located((By.XPATH, '//*[@data-action="dialogClose"]')))
+            fechar_reacts = self.wait.until(EC.visibility_of_element_located(
+                (By.XPATH, '//*[@data-action="dialogClose"]')))
             fechar_reacts.click()
         except TimeoutException:
             return True
-        
+
     def getAuthorComments(self):
         try:
-            authorElement = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, '//*/aside/h3/strong/a[2]')))
+            authorElement = self.wait.until(EC.presence_of_all_elements_located(
+                (By.XPATH, '//*/aside/h3/strong/a[2]')))
             for index, item in enumerate(authorElement):
                 if index > 0:
                     item_text = item.get_attribute('textContent')
@@ -120,13 +120,12 @@ class WebScraping:
                     self.author_list.append(text_formatado)
         except TimeoutException:
             return False
-        
+
     def formatComent(self, autorIndex):
         post_comments_lista_filtrada = [item for item in self.post_comments_ps if item.strip(
         ) != '' and item != 'Valor nao especificado']
         post_comments = ' '.join(
             post_comments_lista_filtrada)
-        
         if self.author_list[autorIndex-1]:
             obj = {
                 "author": self.author_list[autorIndex-1],
@@ -136,9 +135,6 @@ class WebScraping:
             self.post_comments_ps = []
         else:
             return
-        
-        
-        
 
     def pesquisar(self, valor_pesquisa):
         for i in range(1, 10000):
@@ -154,22 +150,18 @@ class WebScraping:
             self.escanear_posts()
 
     def salvar_json(self):
-
         post_context_lista_filtrada = [item for item in self.post_context_ps if item.strip(
         ) != '' and item != 'Valor nao especificado']
         post_context = ' '.join(
             post_context_lista_filtrada)
-        
-        
-
         dados = {
             "title": self.title,
             "link": self.link,
             "Content": {
                 "Author": self.author,
                 "Reacts": {
-                    "god": self.godReacts, 
-                    "bad": self.badReacts 
+                    "god": self.godReacts,
+                    "bad": self.badReacts
                 },
                 "context": post_context,
                 "comments": self.post_comments,
@@ -180,7 +172,8 @@ class WebScraping:
         self.data_update += 1
 
     def save(self):
-        os.makedirs(f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}", exist_ok=True)
+        os.makedirs(
+            f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}", exist_ok=True)
 
         filename = f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/data.json"
         with open(filename, "w") as arquivo:
@@ -188,32 +181,34 @@ class WebScraping:
 
     def get_data_from_elements(self, xpath):
         try:
-            elements = self.wait.until(EC.presence_of_all_elements_located((By.XPATH, xpath)))
+            elements = self.wait.until(
+                EC.presence_of_all_elements_located((By.XPATH, xpath)))
             self.getAuthorComments()
             cauntAuthor = len(self.author_list)
-            
+
             for index, item in enumerate(elements):
                 ps = item.find_elements(By.XPATH, './/p')
                 for p in ps:
                     text = p.get_attribute('textContent')
                     text_formatado = unidecode(text)
-                        
+
                     if index == 0:
                         self.post_context_ps.append(text_formatado)
                         imagens = p.find_elements(By.XPATH, './/a/img')
                         for i, imagem in enumerate(imagens):
                             alt_imagem = imagem.get_attribute('alt')
-                            self.post_context_ps.append(f"-IMG-{alt_imagem}-/IMG-")
+                            self.post_context_ps.append(
+                                f"-IMG-{alt_imagem}-/IMG-")
                     else:
                         self.post_comments_ps.append(text_formatado)
                 if index == 0:
                     self.getReacts()
-                    os.makedirs(f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/Imgs", exist_ok=True)
+                    os.makedirs(
+                        f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/Imgs", exist_ok=True)
                     imagens = item.find_elements(By.XPATH, './/p/a/img')
                     for i, imagem in enumerate(imagens):
                         url_imagem = imagem.get_attribute('data-src')
                         alt_imagem = imagem.get_attribute('alt')
-                        
                         padrao_image_name = r"[<>:\"/\\|?*]"
                         resultado = re.sub(padrao_image_name, "", alt_imagem)
                         nome_arquivo = f"Data/{self.folder_path}/page-[{self.page_count}]/Post-{self.data_update}/Imgs/{resultado}.png"
@@ -223,16 +218,15 @@ class WebScraping:
                             with open(nome_arquivo, 'wb') as file:
                                 file.write(response.content)
                         except requests.HTTPError as e:
-                            logging.error(f"Erro ao baixar a imagem {url_imagem}: {e}")
+                            logging.error(
+                                f"Erro ao baixar a imagem {url_imagem}: {e}")
                         except Exception as e:
-                            logging.error(f"Ocorreu um erro inesperado ao baixar a imagem {url_imagem}: {e}")
-                                          
+                            logging.error(
+                                f"Ocorreu um erro inesperado ao baixar a imagem {url_imagem}: {e}")
                 elif index > 0:
                     self.formatComent(index)
-                
         except TimeoutException:
             logging.error(f'No elements found for xpath: {xpath}')
-                    
 
     def extract_post_data(self, post):
         try:
@@ -253,7 +247,6 @@ class WebScraping:
             author = "Não identificado"
             author_formatado = unidecode(author)
             self.author = author_formatado
-
         try:
             link = titulo_element.get_attribute('href')
             self.link = link
@@ -276,7 +269,6 @@ class WebScraping:
             (By.XPATH, '/html/body/main/div/div/div/div[2]/div[3]/div/ol')))
         posts = self.wait.until(EC.presence_of_all_elements_located(
             (By.XPATH, '//*[@data-role="activityItem"]')))
-
         for post in posts:
             success = self.extract_post_data(post)
             if not success:
