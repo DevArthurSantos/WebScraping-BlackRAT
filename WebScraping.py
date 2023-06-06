@@ -13,6 +13,7 @@ import json
 import re
 import requests
 import logging
+import time
 
 # Configurar o logger
 logging.basicConfig(filename='log.txt', level=logging.ERROR,
@@ -27,7 +28,6 @@ class WebScraping:
         self.link = ""
         self.post_date = ""
         self.author = ""
-        self.part_count = 0
         self.post_context_ps = []
         self.post_comments_ps = []
         self.post_comments = []
@@ -136,18 +136,16 @@ class WebScraping:
             return
 
     def pesquisar(self,):
-        for i in range(1, 10000):
-            url_pesquisa = f'https://www.blackrat.pro/discover/unread/?&stream_read=all&stream_date_type=relative&stream_classes[IPS%5Cforums%5CTopic]=T%C3%B3picos&stream_classes_type=1&stream_date_relative_days[val]=100000000000&stream_date_relative_days[unit]=w'
-            self.driver.get(url_pesquisa)
+        url_pesquisa = f'https://www.blackrat.pro/discover/unread/?&stream_read=all&stream_date_type=relative&stream_classes[IPS%5Cforums%5CTopic]=T%C3%B3picos&stream_classes_type=1&stream_date_relative_days[val]=100000000000&stream_date_relative_days[unit]=w'
+        self.driver.get(url_pesquisa)
+        while True:
             try:
-                next_button = self.wait.until(EC.visibility_of_element_located(
-                    (By.XPATH, '//*[@data-action="loadMore"]')))
+                next_button = self.wait.until(EC.visibility_of_element_located((By.XPATH, '//*[@data-action="loadMore"]')))
                 next_button.click()
+                self.escanear_posts()
             except TimeoutException:
                 break
-            self.part_count = i
-            self.data_update = 1
-            self.escanear_posts()
+            
 
     def salvar_json(self):
         post_context_lista_filtrada = [item for item in self.post_context_ps if item.strip(
@@ -171,16 +169,18 @@ class WebScraping:
         self.global_data = dados
         self.save()
         self.data_update += 1
+        print('post', self.data_update)
 
     def save(self):
         os.makedirs(
-            f"Data/Part-[{self.part_count}]/Post-{self.data_update}", exist_ok=True)
+            f"Data/Post-{self.data_update}", exist_ok=True)
 
-        filename = f"Data/Part-[{self.part_count}]/Post-{self.data_update}/data.json"
+        filename = f"Data/Post-{self.data_update}/data.json"
         with open(filename, "w") as arquivo:
             json.dump(self.global_data, arquivo, indent=2)
 
     def get_data_from_elements(self, xpath):
+        time.sleep(1)
         try:
             elements = self.wait.until(
                 EC.presence_of_all_elements_located((By.XPATH, xpath)))
@@ -188,6 +188,7 @@ class WebScraping:
             cauntAuthor = len(self.author_list)
 
             for index, item in enumerate(elements):
+                time.sleep(1)
                 ps = item.find_elements(By.XPATH, './/p')
                 for p in ps:
                     text = p.get_attribute('textContent')
@@ -205,14 +206,14 @@ class WebScraping:
                 if index == 0:
                     self.getReacts()
                     os.makedirs(
-                        f"Data/Part-[{self.part_count}]/Post-{self.data_update}/Imgs", exist_ok=True)
+                        f"Data/Post-{self.data_update}/Imgs", exist_ok=True)
                     imagens = item.find_elements(By.XPATH, './/p/a/img')
                     for i, imagem in enumerate(imagens):
                         url_imagem = imagem.get_attribute('data-src')
                         alt_imagem = imagem.get_attribute('alt')
                         padrao_image_name = r"[<>:\"/\\|?*]"
                         resultado = re.sub(padrao_image_name, "", alt_imagem)
-                        nome_arquivo = f"Data/Part-[{self.part_count}]/Post-{self.data_update}/Imgs/{resultado}.png"
+                        nome_arquivo = f"Data/Post-{self.data_update}/Imgs/{resultado}.png"
                         try:
                             response = requests.get(url_imagem)
                             response.raise_for_status()
@@ -265,15 +266,21 @@ class WebScraping:
             self.link = nova_url
         except (TimeoutException, StaleElementReferenceException):
             return False
-        self.driver.execute_script(f"window.open('{nova_url}', '_blank');")
-        self.driver.switch_to.window(self.driver.window_handles[-1])
-        self.get_data_from_elements(
-            '//*[@data-role="commentContent"]')
-        self.salvar_json()
-        self.post_context_ps = []
-        self.post_comments = []
-        self.driver.close()
-        self.driver.switch_to.window(self.driver.window_handles[0])
+        try:
+            time.sleep(1)
+            self.driver.execute_script(f"window.open('{nova_url}', '_blank');")
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            self.get_data_from_elements(
+                '//*[@data-role="commentContent"]')
+            self.salvar_json()
+            self.post_context_ps = []
+            self.post_comments = []
+            self.driver.close()
+            time.sleep(1)
+            self.driver.switch_to.window(self.driver.window_handles[0])
+        except (TimeoutException, StaleElementReferenceException):
+            return False
+        
         return True
 
     def escanear_posts(self):
